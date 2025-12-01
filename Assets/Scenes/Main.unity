@@ -271,6 +271,10 @@ MonoBehaviour:
   - {fileID: 2250400466519324533, guid: 5513c34d33badc8948ef24984e94ae3c, type: 3}
   minFoodCount: 2
   maxFoodCount: 6
+  WallPrefabs:
+  - {fileID: 4437054163236264991, guid: 9cbdae6ca7e524f4ab8228e5b2836c7a, type: 3}
+  - {fileID: 1864863706947226687, guid: 9dda91222bba5824fb75dc24e275193c, type: 3}
+  - {fileID: 6473211224942159847, guid: d0403f944778f5446b069c518e49c42f, type: 3}
   Player: {fileID: 2047128601}
 --- !u!156049354 &1263079469
 Grid:
