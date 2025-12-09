@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DefaultNamespace;
 using DefaultNamespace.Interface;
 using UnityEngine;
@@ -16,6 +17,8 @@ public class PlayerController : MonoBehaviour
 
     private InputAction m_InputAction;
     private InputAction m_RestartAction;
+    
+    private List<IPickable> m_Pickables;
 
     private bool m_IsGameOver;
     private Animator m_Animator;
@@ -33,6 +36,7 @@ public class PlayerController : MonoBehaviour
     public void Init()
     {
         m_IsGameOver = false;
+        m_Pickables = new List<IPickable>();
     }
     public void Spawn(BoardManager boardManager, Vector2Int cell)
     {
@@ -124,6 +128,12 @@ public class PlayerController : MonoBehaviour
 
             return;
         }
+    }
+
+    public void Collect(IPickable pickable)
+    {
+        m_Pickables.Add(pickable);
+        Debug.Log(m_Pickables.Count);
     }
 
     public void GameOver()
