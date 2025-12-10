@@ -76,8 +76,8 @@ public class Enemy : CellObject
       
       if (playerCell.IsAdjacentTo(MCell))
       {
-          if (GameManager.Instance.Player.Is<Damageable>()) {
-              var damageable = GameManager.Instance.Player.As<Damageable>();
+          if (GameManager.Instance.player.Is<Damageable>()) {
+              var damageable = GameManager.Instance.player.As<Damageable>();
               damageable.ReceiveDamage(3);
           }
       }

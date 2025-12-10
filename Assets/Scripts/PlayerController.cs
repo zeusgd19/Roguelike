@@ -17,8 +17,6 @@ public class PlayerController : MonoBehaviour
 
     private InputAction m_InputAction;
     private InputAction m_RestartAction;
-    
-    private List<IPickable> m_Pickables;
 
     private bool m_IsGameOver;
     private Animator m_Animator;
@@ -36,7 +34,6 @@ public class PlayerController : MonoBehaviour
     public void Init()
     {
         m_IsGameOver = false;
-        m_Pickables = new List<IPickable>();
     }
     public void Spawn(BoardManager boardManager, Vector2Int cell)
     {
@@ -66,7 +63,6 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         m_InputAction = InputSystem.actions.FindAction("Move");
-        m_RestartAction = InputSystem.actions.FindAction("Restart");
     }
 
     // Update is called once per frame
@@ -74,7 +70,7 @@ public class PlayerController : MonoBehaviour
     {
         if (m_IsGameOver)
         {
-            if (m_RestartAction.WasPressedThisFrame())
+            if (Input.GetKeyDown(KeyCode.Return))
             {
                 GameManager.Instance.StartNewGame();
             }
@@ -128,12 +124,6 @@ public class PlayerController : MonoBehaviour
 
             return;
         }
-    }
-
-    public void Collect(IPickable pickable)
-    {
-        m_Pickables.Add(pickable);
-        Debug.Log(m_Pickables.Count);
     }
 
     public void GameOver()

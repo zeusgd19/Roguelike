@@ -8,26 +8,31 @@ using UnityEngine.UIElements;
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-    
+
     [FormerlySerializedAs("Board")] public BoardManager board;
     [FormerlySerializedAs("Player")] public PlayerController player;
     public TurnManager TurnManager { get; private set; }
 
     [FormerlySerializedAs("UIDoc")] public UIDocument uiDoc;
-    
+
     public InventoryManager Inventory;
-    
+
     private Label m_FoodLabel;
+
     // Fallback UI (UnityEngine.UI) si no hay UIDocument / Label
     private Text m_FoodTextFallback;
 
+    private Label m_DeathLabel;
     private int m_FoodAmount = 20;
+    private DeathManager m_DeathManager;
     private int m_CurrentLevel = 1;
     private VisualElement m_GameOverPanel;
     private Label m_GameOverMessage;
 
     // impide que ticks tempranos afecten al estado
     private bool initialized = false;
+
+    private bool m_IsGameActive = false;
 
     private void Awake()
     {
@@ -40,8 +45,9 @@ public class GameManager : MonoBehaviour
         Instance = this;
         // aseguramos un valor por defecto
         m_FoodAmount = 20;
+        m_DeathManager = new DeathManager();
     }
-    
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -55,6 +61,12 @@ public class GameManager : MonoBehaviour
         // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
         initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
         NewLevel(); // mantengo tu llamada original por compatibilidad con tu flujo
+
+        m_GameOverPanel = uiDoc.rootVisualElement.Q<VisualElement>("GameOverPanel");
+        m_GameOverMessage = m_GameOverPanel.Q<Label>("GameOverMessage");
+        m_FoodLabel = uiDoc.rootVisualElement.Q<Label>("FoodLabel");
+        m_DeathLabel = uiDoc.rootVisualElement.Q<Label>("DeathLabel");
+
         StartNewGame();
         initialized = true;
     }
@@ -129,9 +141,9 @@ public class GameManager : MonoBehaviour
         // Ignorar ticks hasta que la inicialización haya finalizado
         if (!initialized) return;
         ChangeFood(-1);
-        
+
     }
-    
+
     public void ChangeFood(int amount)
     {
         // Seguridad: si aún no estamos completamente inicializados, ignorar cambios accidentales
@@ -167,62 +179,88 @@ public class GameManager : MonoBehaviour
         {
             if (player != null) player.GameOver();
             if (m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Visible;
-            if (m_GameOverMessage != null) m_GameOverMessage.text = "Game Over!\n\nYou traveled through " + m_CurrentLevel + " levels";
+            if (m_GameOverMessage != null)
+                m_GameOverMessage.text = "Game Over!\n\nYou traveled through " + m_CurrentLevel + " levels";
             // Si no hay UI Toolkit, como fallback mostramos por consola
             if (m_GameOverPanel == null)
                 Debug.Log("[GameManager] Game Over! (no GameOverPanel encontrado)");
+            if (!m_IsGameActive) return;
+            m_FoodAmount += amount;
+            if (m_FoodAmount < 0) m_FoodAmount = 0;
+            m_FoodLabel.text = "Food : " + m_FoodAmount;
+
+            if (m_FoodAmount <= 0)
+            {
+                m_IsGameActive = false;
+                player.GameOver();
+                m_GameOverPanel.style.visibility = Visibility.Visible;
+                m_GameOverMessage.text = "Game Over!\n\nPress Enter for New Game\n\nYou traveled through " +
+                                         m_CurrentLevel + " levels";
+                HandlePlayerDeath();
+            }
         }
     }
 
-    public void NewLevel()
-    {
-        // Subimos el nivel primero para que BoardManager reciba el nuevo número
-        m_CurrentLevel++;
-        Debug.Log($"[GameManager] NewLevel -> level={m_CurrentLevel}");
-
-        if (board != null)
+    private void HandlePlayerDeath()
         {
-            board.Clear();
-            board.InitLevel(m_CurrentLevel); // BoardManager usará level para tamaño
-        }
-        else
-        {
-            Debug.LogWarning("[GameManager] board is null on NewLevel()");
+            m_DeathManager.RegisterDeath();
+            m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
         }
 
-        if (player != null) player.Spawn(board, new Vector2Int(1,1));
+        public void NewLevel()
+        {
+            // Subimos el nivel primero para que BoardManager reciba el nuevo número
+            m_CurrentLevel++;
+            Debug.Log($"[GameManager] NewLevel -> level={m_CurrentLevel}");
+
+            if (board != null)
+            {
+                board.Clear();
+                board.InitLevel(m_CurrentLevel); // BoardManager usará level para tamaño
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] board is null on NewLevel()");
+            }
+
+            if (player != null) player.Spawn(board, new Vector2Int(1, 1));
+        }
+
+
+        public void StartNewGame()
+        {
+            // Ocultar GameOver si hay panel
+            if (m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Hidden;
+
+            m_CurrentLevel = 1;
+            m_FoodAmount = 20;
+
+            // actualizar UI (ambos tipos)
+            if (m_FoodLabel != null) m_FoodLabel.text = "Food : " + m_FoodAmount;
+            if (m_FoodTextFallback != null) m_FoodTextFallback.text = "Food : " + m_FoodAmount;
+
+            if (board != null)
+            {
+                board.Clear();
+                board.Init();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] board no asignado en inspector en StartNewGame().");
+            }
+
+            m_GameOverPanel.style.visibility = Visibility.Hidden;
+            m_IsGameActive = true;
+            m_CurrentLevel = 1;
+            m_FoodAmount = 20;
+            m_FoodLabel.text = "Food : " + m_FoodAmount;
+            m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
+
+            if (player != null)
+            {
+                player.Init();
+                player.Spawn(board, new Vector2Int(1, 1));
+            }
+        }
     }
-
-
-    public void StartNewGame()
-    {
-        // Ocultar GameOver si hay panel
-        if (m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Hidden;
-
-        m_CurrentLevel = 1;
-        m_FoodAmount = 20;
-
-        // actualizar UI (ambos tipos)
-        if (m_FoodLabel != null) m_FoodLabel.text = "Food : " + m_FoodAmount;
-        if (m_FoodTextFallback != null) m_FoodTextFallback.text = "Food : " + m_FoodAmount;
-
-        if (board != null)
-        {
-            board.Clear();
-            board.Init();
-        }
-        else
-        {
-            Debug.LogWarning("[GameManager] board no asignado en inspector en StartNewGame().");
-        }
-        
-        if (player != null)
-        {
-            player.Init();
-            player.Spawn(board, new Vector2Int(1,1));
-        }
-    }
-
-    
-}
  

@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Generic;
-using DefaultNamespace.Components;
-using DefaultNamespace.ExtensionMethods;
-using DefaultNamespace.Interface; 
 using UnityEngine;
 using UnityEngine.UI;
 
