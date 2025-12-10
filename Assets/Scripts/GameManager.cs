@@ -1,4 +1,5 @@
 using System;
+using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -14,7 +15,8 @@ public class GameManager : MonoBehaviour
 
     [FormerlySerializedAs("UIDoc")] public UIDocument uiDoc;
     
-    // UI Toolkit label (preferida)
+    public InventoryManager Inventory;
+    
     private Label m_FoodLabel;
     // Fallback UI (UnityEngine.UI) si no hay UIDocument / Label
     private Text m_FoodTextFallback;
@@ -127,6 +129,7 @@ public class GameManager : MonoBehaviour
         // Ignorar ticks hasta que la inicialización haya finalizado
         if (!initialized) return;
         ChangeFood(-1);
+        
     }
     
     public void ChangeFood(int amount)
@@ -219,5 +222,7 @@ public class GameManager : MonoBehaviour
             player.Spawn(board, new Vector2Int(1,1));
         }
     }
+
+    
 }
  

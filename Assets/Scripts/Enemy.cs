@@ -1,4 +1,7 @@
+using DefaultNamespace.Components;
+using DefaultNamespace.ExtensionMethods;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class Enemy : CellObject
 {
@@ -6,6 +9,7 @@ public class Enemy : CellObject
   
    private int m_CurrentHealth;
 
+  
    private void Awake()
    {
       GameManager.Instance.TurnManager.OnTick += TurnHappened;
@@ -69,11 +73,13 @@ public class Enemy : CellObject
       int absXDist = Mathf.Abs(xDist);
       int absYDist = Mathf.Abs(yDist);
 
-      if ((xDist == 0 && absYDist == 1)
-          || (yDist == 0 && absXDist == 1))
+      
+      if (playerCell.IsAdjacentTo(MCell))
       {
-          //we are adjacent to the player, attack!
-          GameManager.Instance.ChangeFood(-3);
+          if (GameManager.Instance.Player.Is<Damageable>()) {
+              var damageable = GameManager.Instance.Player.As<Damageable>();
+              damageable.ReceiveDamage(3);
+          }
       }
       else
       {
