@@ -104,8 +104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7aac0efc2e6d85a6582576df8ef71b9d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FoodObject
-  Name: Hamburguer
-  AmountGranted: 9
+  item: {fileID: 11400000, guid: f97caf4a58683a27482460088d83b42e, type: 2}
 --- !u!114 &4507623144636112275
 MonoBehaviour:
   m_ObjectHideFlags: 0

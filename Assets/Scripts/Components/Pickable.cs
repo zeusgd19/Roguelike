@@ -5,9 +5,10 @@ namespace DefaultNamespace.Components
 {
     public class Pickable: MonoBehaviour, IPickable
     {
-        public void PickUp(IPickable pickable)
+        public void PickUp(Item item)
         {
-            GameManager.Instance.Player.Collect(pickable);
+            item.Stack++;
+            GameManager.Instance.Inventory.Add(item);
         }
     }
 }

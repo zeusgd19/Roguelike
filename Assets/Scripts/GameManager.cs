@@ -1,4 +1,5 @@
 using System;
+using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -12,6 +13,8 @@ public class GameManager : MonoBehaviour
     public TurnManager TurnManager {get; private set;}
 
     public UIDocument UIDoc;
+    
+    public InventoryManager Inventory;
     
     private Label m_FoodLabel;
     private int m_FoodAmount = 20;

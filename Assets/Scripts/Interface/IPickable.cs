@@ -2,6 +2,6 @@ namespace DefaultNamespace.Interface
 {
     public interface IPickable
     {
-        public void PickUp(IPickable pickable);
+        public void PickUp(Item item);
     }
 }
