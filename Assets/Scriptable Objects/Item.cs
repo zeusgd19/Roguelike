@@ -8,7 +8,6 @@ public abstract class Item : ScriptableObject
     public string ItemName;
     public int Amount;
     public Sprite ItemSprite;
-    public int Stack;
 
     public abstract void Use();
 }

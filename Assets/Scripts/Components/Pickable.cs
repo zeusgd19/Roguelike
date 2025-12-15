@@ -1,3 +1,4 @@
+using System;
 using DefaultNamespace.Interface;
 using UnityEngine;
 
@@ -7,7 +8,7 @@ namespace DefaultNamespace.Components
     {
         public void PickUp(Item item)
         {
-            item.Stack++;
+            
             GameManager.Instance.Inventory.Add(item);
         }
     }

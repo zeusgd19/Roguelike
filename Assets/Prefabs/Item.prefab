@@ -68,7 +68,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -236538889, guid: 56b5efc0288bc754883726732f33cc3c, type: 3}
+  m_Sprite: {fileID: -1552940956, guid: 2315cc0495cb2054ea5dd392c1cff51e, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -146,7 +146,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8404e6886f0d468faee2e27868bf5804, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefaultNamespace.UIObject
-  item: {fileID: 0}
+  item: {fileID: 11400000, guid: f97caf4a58683a27482460088d83b42e, type: 2}
 --- !u!1 &9017821113279098510
 GameObject:
   m_ObjectHideFlags: 0
