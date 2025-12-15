@@ -1,36 +1,47 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
+using UnityEngine.UI;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement; 
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance {get; private set;}
-    
-    public BoardManager Board;
-    public PlayerController Player;
-    public TurnManager TurnManager {get; private set;}
-    public UIDocument UIDoc;
-    
-    // UI Elements
-    private VisualElement m_HealthBarFill;
-    private VisualElement m_DangerIcon; // Referencia a la calavera
-    
-    private Label m_ScoreLabel;
+    public static GameManager Instance { get; private set; }
+
+    [FormerlySerializedAs("Board")] public BoardManager board;
+    [FormerlySerializedAs("Player")] public PlayerController player;
+    public TurnManager TurnManager { get; private set; }
+
+    [FormerlySerializedAs("UIDoc")] public UIDocument uiDoc;
+
+    public InventoryManager Inventory;
+
+    private Label m_FoodLabel;
+
+    // Fallback UI (UnityEngine.UI) si no hay UIDocument / Label
+    private Text m_FoodTextFallback;
+
+    private Label m_DeathLabel;
+    private int m_FoodAmount = 20;
+    private DeathManager m_DeathManager;
+    private int m_CurrentLevel = 1;
     private VisualElement m_GameOverPanel;
     private Label m_GameOverMessage;
+
+    // impide que ticks tempranos afecten al estado
+    private bool initialized = false;
+
+    private bool m_IsGameActive = false;
+  public int MaxFood = 100;
+// UI Elements
+    private VisualElement m_HealthBarFill;
+    private VisualElement m_DangerIcon;
+    private Label m_ScoreLabel;
     private Button m_RestartButton;
-
-    // Game State
-    public int MaxFood = 100; 
-    private int m_FoodAmount;
-    private int m_CurrentLevel = 1;
-    private int m_Score = 0;
-
-    // Control del parpadeo
     private Coroutine m_BlinkCoroutine;
-
+    private int m_Score = 0;
     private void Awake()
     {
         if (Instance != null)
@@ -39,10 +50,15 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+        // aseguramos un valor por defecto
+        m_FoodAmount = 20;
+        m_DeathManager = new DeathManager();
     }
-    
+
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        // inicializamos TurnManager y nos suscribimos
         TurnManager = new TurnManager();
         TurnManager.OnTick += OnTurnHappen;
         
@@ -59,7 +75,75 @@ public class GameManager : MonoBehaviour
         
         if (m_RestartButton != null) m_RestartButton.clicked += ReloadScene;
         
+
+        // inicializamos UI (UI Toolkit si hay uiDoc)
+        InitializeUI();
+
+        // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
+        initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
+        NewLevel(); // mantengo tu llamada original por compatibilidad con tu flujo
         StartNewGame();
+        initialized = true;
+    }
+
+    void InitializeUI()
+    {
+        // Si hay UIDocument, intentar obtener elementos por nombre
+        if (uiDoc != null)
+        {
+            try
+            {
+                m_GameOverPanel = uiDoc.rootVisualElement.Q<VisualElement>("GameOverPanel");
+                if (m_GameOverPanel != null)
+                    m_GameOverMessage = m_GameOverPanel.Q<Label>("GameOverMessage");
+                m_FoodLabel = uiDoc.rootVisualElement.Q<Label>("FoodLabel");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[GameManager] Error leyendo UIDocument: " + ex.Message);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] uiDoc no asignado en el inspector. Usaré un fallback UI Text.");
+        }
+
+        // Si no encontramos la FoodLabel de UI Toolkit, creamos un fallback sencillo con Canvas + Text
+        if (m_FoodLabel == null)
+        {
+            CreateFallbackFoodText();
+            Debug.Log("[GameManager] FoodLabel no encontrada -> creado fallback Text en Canvas.");
+        }
+    }
+
+    void CreateFallbackFoodText()
+    {
+        // intenta reutilizar un Canvas existente
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            GameObject canvasGO = new GameObject("RuntimeCanvas");
+            canvas = canvasGO.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasGO.AddComponent<CanvasScaler>();
+            canvasGO.AddComponent<GraphicRaycaster>();
+        }
+
+        // crear GameObject Text
+        GameObject txtGO = new GameObject("FoodTextFallback");
+        txtGO.transform.SetParent(canvas.transform, false);
+        m_FoodTextFallback = txtGO.AddComponent<Text>();
+        m_FoodTextFallback.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        m_FoodTextFallback.fontSize = 18;
+        m_FoodTextFallback.alignment = TextAnchor.UpperLeft;
+        m_FoodTextFallback.color = Color.black;
+        m_FoodTextFallback.rectTransform.anchorMin = new Vector2(0, 1);
+        m_FoodTextFallback.rectTransform.anchorMax = new Vector2(0, 1);
+        m_FoodTextFallback.rectTransform.pivot = new Vector2(0, 1);
+        m_FoodTextFallback.rectTransform.anchoredPosition = new Vector2(10, -10);
+
+        // inicial text
+        m_FoodTextFallback.text = "Food : " + m_FoodAmount;
     }
 
     void ReloadScene()
@@ -69,11 +153,21 @@ public class GameManager : MonoBehaviour
 
     void OnTurnHappen()
     {
+        // Ignorar ticks hasta que la inicialización haya finalizado
+        if (!initialized) return;
         ChangeFood(-1);
+
     }
-    
+
     public void ChangeFood(int amount)
     {
+        // Seguridad: si aún no estamos completamente inicializados, ignorar cambios accidentales
+        if (!initialized)
+        {
+            Debug.Log("[GameManager] ChangeFood ignorado porque game no está inicializado todavía.");
+            return;
+        }
+
         m_FoodAmount += amount;
         m_FoodAmount = Mathf.Clamp(m_FoodAmount, 0, MaxFood);
 
@@ -110,6 +204,26 @@ public class GameManager : MonoBehaviour
         }
         // --------------------------------
 
+        // actualizar UI Toolkit si existe
+        if (m_FoodLabel != null)
+        {
+            try
+            {
+                m_FoodLabel.text = "Food : " + m_FoodAmount;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[GameManager] error actualizando m_FoodLabel: " + ex.Message);
+            }
+        }
+
+        // actualizar fallback UI Text si existe
+        if (m_FoodTextFallback != null)
+        {
+            m_FoodTextFallback.text = "Food : " + m_FoodAmount;
+        }
+
+        // comprobaciones GameOver
         if (m_FoodAmount <= 0)
         {
             StopBlinking();
@@ -173,6 +287,12 @@ public class GameManager : MonoBehaviour
             yield return null; 
         }
     }
+    
+    private void HandlePlayerDeath()
+        {
+            m_DeathManager.RegisterDeath();
+            m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
+        }
     // ------------------------------------
 
     public void AddScore(int amount)
@@ -184,6 +304,7 @@ public class GameManager : MonoBehaviour
     public void GameOver()
     {
         Player.GameOver();
+        HandlePlayerDeath();
         if(m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Visible;
         string finalMessage = "GAME OVER\n\nLevel: " + m_CurrentLevel + "\nTOTAL SCORE: " + m_Score;
         if(m_GameOverMessage != null) m_GameOverMessage.text = finalMessage;
