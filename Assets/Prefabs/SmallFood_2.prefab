@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6616353772444054329}
   - component: {fileID: 5069104651513929045}
   - component: {fileID: 2442716675377147550}
+  - component: {fileID: -7233249481830990637}
   m_Layer: 0
   m_Name: SmallFood_2
   m_TagString: Untagged
@@ -103,4 +104,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7aac0efc2e6d85a6582576df8ef71b9d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FoodObject
-  AmountGranted: 3
+  item: {fileID: 11400000, guid: 634e661aa51275e249f492dc8758375f, type: 2}
+--- !u!114 &-7233249481830990637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8203796468258248515}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3372a54e41443889670c0f55ec755fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DefaultNamespace.Components.Pickable
