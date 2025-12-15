@@ -232,6 +232,7 @@ MonoBehaviour:
   player: {fileID: 2047128601}
   uiDoc: {fileID: 783348122}
   Inventory: {fileID: 586537616}
+  MaxFood: 100
 --- !u!4 &586537615
 Transform:
   m_ObjectHideFlags: 0
@@ -493,8 +494,8 @@ MonoBehaviour:
     randomMin: 1
     randomMax: 100
     cellsPer: 100
-    levelMultiplier: 0.2
-    baseCount: 0
+    levelMultiplier: 1
+    baseCount: 1
     roundUp: 0
     maxCap: 0
   spawnerPrefab: {fileID: 0}

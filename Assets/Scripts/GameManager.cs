@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
+using DefaultNamespace;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
-using UnityEngine.SceneManagement; 
+using Button = UnityEngine.UIElements.Button;
 
 public class GameManager : MonoBehaviour
 {
@@ -34,8 +36,8 @@ public class GameManager : MonoBehaviour
     private bool initialized = false;
 
     private bool m_IsGameActive = false;
-  public int MaxFood = 100;
-// UI Elements
+    public int MaxFood = 100;
+    // UI Elements
     private VisualElement m_HealthBarFill;
     private VisualElement m_DangerIcon;
     private Label m_ScoreLabel;
@@ -62,22 +64,18 @@ public class GameManager : MonoBehaviour
         TurnManager = new TurnManager();
         TurnManager.OnTick += OnTurnHappen;
         
+        // inicializamos UI (UI Toolkit si hay uiDoc)
+        InitializeUI();
+        
         // Enlazar UI
-        var root = UIDoc.rootVisualElement;
+        var root = uiDoc.rootVisualElement;
         
         m_HealthBarFill = root.Q<VisualElement>("HealthBarFill");
         m_DangerIcon = root.Q<VisualElement>("DangerIcon"); 
-        
         m_ScoreLabel = root.Q<Label>("ScoreLabel");
-        m_GameOverPanel = root.Q<VisualElement>("GameOverPanel");
-        m_GameOverMessage = root.Q<Label>("GameOverMessage");
         m_RestartButton = root.Q<Button>("RestartButton");
         
         if (m_RestartButton != null) m_RestartButton.clicked += ReloadScene;
-        
-
-        // inicializamos UI (UI Toolkit si hay uiDoc)
-        InitializeUI();
 
         // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
         initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
@@ -97,6 +95,9 @@ public class GameManager : MonoBehaviour
                 if (m_GameOverPanel != null)
                     m_GameOverMessage = m_GameOverPanel.Q<Label>("GameOverMessage");
                 m_FoodLabel = uiDoc.rootVisualElement.Q<Label>("FoodLabel");
+                m_FoodLabel.text = "Food : " + m_FoodAmount;
+                m_DeathLabel = uiDoc.rootVisualElement.Q<Label>("DeathLabel");
+                m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
             }
             catch (Exception ex)
             {
@@ -303,19 +304,28 @@ public class GameManager : MonoBehaviour
 
     public void GameOver()
     {
-        Player.GameOver();
-        HandlePlayerDeath();
+        player.GameOver();
         if(m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Visible;
         string finalMessage = "GAME OVER\n\nLevel: " + m_CurrentLevel + "\nTOTAL SCORE: " + m_Score;
         if(m_GameOverMessage != null) m_GameOverMessage.text = finalMessage;
+        HandlePlayerDeath();
     }
 
     public void NewLevel()
     {
-        Board.Clear();
-        Board.Init();
-        Player.Spawn(Board, new Vector2Int(1,1));
         m_CurrentLevel++;
+
+        if (board != null)
+        {
+            board.Clear();
+            board.InitLevel(m_CurrentLevel);
+        }
+        else
+        {
+            
+        }
+        
+        if(player != null) player.Spawn(board, new Vector2Int(1,1));
     }
 
     public void StartNewGame()
@@ -331,9 +341,9 @@ public class GameManager : MonoBehaviour
         
         if(m_ScoreLabel != null) m_ScoreLabel.text = "Score: " + m_Score;
         
-        Board.Clear();
-        Board.Init();
-        Player.Init();
-        Player.Spawn(Board, new Vector2Int(1,1));
+        board.Clear();
+        board.Init();
+        player.Init();
+        player.Spawn(board, new Vector2Int(1,1));
     }
 }
