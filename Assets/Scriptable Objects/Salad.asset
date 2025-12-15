@@ -15,4 +15,4 @@ MonoBehaviour:
   ItemName: Salad
   Amount: 3
   ItemSprite: {fileID: -236538889, guid: 56b5efc0288bc754883726732f33cc3c, type: 3}
-  Stack: 0
+  Stack: 2

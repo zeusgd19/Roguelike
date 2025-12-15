@@ -194,7 +194,7 @@ public class GameManager : MonoBehaviour
                 m_IsGameActive = false;
                 player.GameOver();
                 m_GameOverPanel.style.visibility = Visibility.Visible;
-                m_GameOverMessage.text = "Game Over!\n\nPress Enter for New Game\n\nYou traveled through " +
+                m_GameOverMessage.text = "Game Over!\n\nPress R for New Game\n\nYou traveled through " +
                                          m_CurrentLevel + " levels";
                 HandlePlayerDeath();
             }
@@ -260,6 +260,11 @@ public class GameManager : MonoBehaviour
             {
                 player.Init();
                 player.Spawn(board, new Vector2Int(1, 1));
+            }
+
+            if (Inventory != null)
+            {
+                Inventory.Clear();
             }
         }
     }
