@@ -1,9 +1,10 @@
 using System;
-using DefaultNamespace;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 using UnityEngine.UIElements;
+using UnityEngine.SceneManagement; 
 
 public class GameManager : MonoBehaviour
 {
@@ -33,7 +34,14 @@ public class GameManager : MonoBehaviour
     private bool initialized = false;
 
     private bool m_IsGameActive = false;
-
+  public int MaxFood = 100;
+// UI Elements
+    private VisualElement m_HealthBarFill;
+    private VisualElement m_DangerIcon;
+    private Label m_ScoreLabel;
+    private Button m_RestartButton;
+    private Coroutine m_BlinkCoroutine;
+    private int m_Score = 0;
     private void Awake()
     {
         if (Instance != null)
@@ -41,7 +49,6 @@ public class GameManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
         Instance = this;
         // aseguramos un valor por defecto
         m_FoodAmount = 20;
@@ -54,6 +61,20 @@ public class GameManager : MonoBehaviour
         // inicializamos TurnManager y nos suscribimos
         TurnManager = new TurnManager();
         TurnManager.OnTick += OnTurnHappen;
+        
+        // Enlazar UI
+        var root = UIDoc.rootVisualElement;
+        
+        m_HealthBarFill = root.Q<VisualElement>("HealthBarFill");
+        m_DangerIcon = root.Q<VisualElement>("DangerIcon"); 
+        
+        m_ScoreLabel = root.Q<Label>("ScoreLabel");
+        m_GameOverPanel = root.Q<VisualElement>("GameOverPanel");
+        m_GameOverMessage = root.Q<Label>("GameOverMessage");
+        m_RestartButton = root.Q<Button>("RestartButton");
+        
+        if (m_RestartButton != null) m_RestartButton.clicked += ReloadScene;
+        
 
         // inicializamos UI (UI Toolkit si hay uiDoc)
         InitializeUI();
@@ -61,12 +82,6 @@ public class GameManager : MonoBehaviour
         // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
         initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
         NewLevel(); // mantengo tu llamada original por compatibilidad con tu flujo
-
-        m_GameOverPanel = uiDoc.rootVisualElement.Q<VisualElement>("GameOverPanel");
-        m_GameOverMessage = m_GameOverPanel.Q<Label>("GameOverMessage");
-        m_FoodLabel = uiDoc.rootVisualElement.Q<Label>("FoodLabel");
-        m_DeathLabel = uiDoc.rootVisualElement.Q<Label>("DeathLabel");
-
         StartNewGame();
         initialized = true;
     }
@@ -131,9 +146,9 @@ public class GameManager : MonoBehaviour
         m_FoodTextFallback.text = "Food : " + m_FoodAmount;
     }
 
-    // Update is called once per frame
-    void Update()
+    void ReloadScene()
     {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     void OnTurnHappen()
@@ -154,6 +169,40 @@ public class GameManager : MonoBehaviour
         }
 
         m_FoodAmount += amount;
+        m_FoodAmount = Mathf.Clamp(m_FoodAmount, 0, MaxFood);
+
+        // ---  BARRA Y COLORES ---
+        if (m_HealthBarFill != null)
+        {
+            float percentage = (float)m_FoodAmount / MaxFood * 100f;
+            m_HealthBarFill.style.width = Length.Percent(percentage);
+            
+            // Usamos StyleColor para compatibilidad completa
+            if(percentage > 50) 
+            {
+                // Verde - Todo bien
+                m_HealthBarFill.style.backgroundColor = new StyleColor(new Color(0.2f, 0.8f, 0.2f)); 
+                StopBlinking(); 
+            }
+            else if (percentage > 25)
+            {
+                // Naranja - Advertencia
+                m_HealthBarFill.style.backgroundColor = new StyleColor(new Color(1f, 0.64f, 0f)); 
+                StopBlinking();
+            }
+            else 
+            {
+                // Rojo - CRÍTICO
+                m_HealthBarFill.style.backgroundColor = new StyleColor(Color.red);
+                
+                // Solo parpadea si estamos vivos
+                if(m_FoodAmount > 0)
+                {
+                    StartBlinking(); 
+                }
+            }
+        }
+        // --------------------------------
 
         // actualizar UI Toolkit si existe
         if (m_FoodLabel != null)
@@ -177,95 +226,114 @@ public class GameManager : MonoBehaviour
         // comprobaciones GameOver
         if (m_FoodAmount <= 0)
         {
-            if (player != null) player.GameOver();
-            if (m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Visible;
-            if (m_GameOverMessage != null)
-                m_GameOverMessage.text = "Game Over!\n\nYou traveled through " + m_CurrentLevel + " levels";
-            // Si no hay UI Toolkit, como fallback mostramos por consola
-            if (m_GameOverPanel == null)
-                Debug.Log("[GameManager] Game Over! (no GameOverPanel encontrado)");
-            if (!m_IsGameActive) return;
-            m_FoodAmount += amount;
-            if (m_FoodAmount < 0) m_FoodAmount = 0;
-            m_FoodLabel.text = "Food : " + m_FoodAmount;
-
-            if (m_FoodAmount <= 0)
-            {
-                m_IsGameActive = false;
-                player.GameOver();
-                m_GameOverPanel.style.visibility = Visibility.Visible;
-                m_GameOverMessage.text = "Game Over!\n\nPress R for New Game\n\nYou traveled through " +
-                                         m_CurrentLevel + " levels";
-                HandlePlayerDeath();
-            }
+            StopBlinking();
+            GameOver();
         }
     }
 
+    // LATIDO 
+    void StartBlinking()
+    {
+        // Si ya está parpadeando, no hacemos nada para no duplicar corrutinas
+        if (m_BlinkCoroutine != null) return;
+        
+        if (m_DangerIcon != null)
+        {
+            m_BlinkCoroutine = StartCoroutine(BlinkRoutine());
+        }
+    }
+
+    void StopBlinking()
+    {
+        if (m_BlinkCoroutine != null)
+        {
+            StopCoroutine(m_BlinkCoroutine);
+            m_BlinkCoroutine = null;
+        }
+        
+        // Aseguramos que se oculte y reseteamos la opacidad
+        if (m_DangerIcon != null)
+        {
+            m_DangerIcon.style.visibility = Visibility.Hidden;
+            m_DangerIcon.style.opacity = 1f; // Resetear para la próxima vez
+        }
+    }
+
+    IEnumerator BlinkRoutine()
+    {
+        // Hacemos visible el icono antes de empezar a cambiar la opacidad
+        m_DangerIcon.style.visibility = Visibility.Visible;
+        
+        float duration = 0.5f; // Duración de medio latido 
+
+        while (true)
+        {
+            // De transparente a visible (Fade In)
+            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
+            {
+                m_DangerIcon.style.opacity = t; 
+                yield return null;
+            }
+            
+            m_DangerIcon.style.opacity = 1f; // Asegurar tope visible
+
+            // De visible a transparente 
+            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
+            {
+                m_DangerIcon.style.opacity = 1f - t;
+                yield return null;
+            }
+            // Pequeña pausa 
+            yield return null; 
+        }
+    }
+    
     private void HandlePlayerDeath()
         {
             m_DeathManager.RegisterDeath();
             m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
         }
+    // ------------------------------------
 
-        public void NewLevel()
-        {
-            // Subimos el nivel primero para que BoardManager reciba el nuevo número
-            m_CurrentLevel++;
-            Debug.Log($"[GameManager] NewLevel -> level={m_CurrentLevel}");
-
-            if (board != null)
-            {
-                board.Clear();
-                board.InitLevel(m_CurrentLevel); // BoardManager usará level para tamaño
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] board is null on NewLevel()");
-            }
-
-            if (player != null) player.Spawn(board, new Vector2Int(1, 1));
-        }
-
-
-        public void StartNewGame()
-        {
-            // Ocultar GameOver si hay panel
-            if (m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Hidden;
-
-            m_CurrentLevel = 1;
-            m_FoodAmount = 20;
-
-            // actualizar UI (ambos tipos)
-            if (m_FoodLabel != null) m_FoodLabel.text = "Food : " + m_FoodAmount;
-            if (m_FoodTextFallback != null) m_FoodTextFallback.text = "Food : " + m_FoodAmount;
-
-            if (board != null)
-            {
-                board.Clear();
-                board.Init();
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] board no asignado en inspector en StartNewGame().");
-            }
-
-            m_GameOverPanel.style.visibility = Visibility.Hidden;
-            m_IsGameActive = true;
-            m_CurrentLevel = 1;
-            m_FoodAmount = 20;
-            m_FoodLabel.text = "Food : " + m_FoodAmount;
-            m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
-
-            if (player != null)
-            {
-                player.Init();
-                player.Spawn(board, new Vector2Int(1, 1));
-            }
-
-            if (Inventory != null)
-            {
-                Inventory.Clear();
-            }
-        }
+    public void AddScore(int amount)
+    {
+        m_Score += amount;
+        if (m_ScoreLabel != null) m_ScoreLabel.text = "Score: " + m_Score;
     }
- 
+
+    public void GameOver()
+    {
+        Player.GameOver();
+        HandlePlayerDeath();
+        if(m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Visible;
+        string finalMessage = "GAME OVER\n\nLevel: " + m_CurrentLevel + "\nTOTAL SCORE: " + m_Score;
+        if(m_GameOverMessage != null) m_GameOverMessage.text = finalMessage;
+    }
+
+    public void NewLevel()
+    {
+        Board.Clear();
+        Board.Init();
+        Player.Spawn(Board, new Vector2Int(1,1));
+        m_CurrentLevel++;
+    }
+
+    public void StartNewGame()
+    {
+        if(m_GameOverPanel != null) m_GameOverPanel.style.visibility = Visibility.Hidden;
+        m_CurrentLevel = 1;
+        m_FoodAmount = MaxFood; 
+        m_Score = 0;
+        
+        // Reset inicial UI
+        ChangeFood(0); 
+        StopBlinking(); 
+        
+        if(m_ScoreLabel != null) m_ScoreLabel.text = "Score: " + m_Score;
+        
+        Board.Clear();
+        Board.Init();
+        Player.Init();
+        Player.Spawn(Board, new Vector2Int(1,1));
+    }
+}
