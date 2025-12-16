@@ -75,7 +75,7 @@ public class GameManager : MonoBehaviour
         m_ScoreLabel = root.Q<Label>("ScoreLabel");
         m_RestartButton = root.Q<Button>("RestartButton");
         
-        if (m_RestartButton != null) m_RestartButton.clicked += ReloadScene;
+        if (m_RestartButton != null) m_RestartButton.clicked += StartNewGame;
 
         // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
         initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
