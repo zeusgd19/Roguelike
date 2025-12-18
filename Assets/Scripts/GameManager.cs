@@ -1,6 +1,6 @@
 using System;
 using System.Collections;
-using DefaultNamespace;
+using DefaultNamespace; // NECESARIO para que reconozca InventoryManager
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -18,32 +18,31 @@ public class GameManager : MonoBehaviour
 
     [FormerlySerializedAs("UIDoc")] public UIDocument uiDoc;
 
-    public InventoryManager Inventory;
-
+    // --- VARIABLES ORIGINALES CONSERVADAS ---
+    public InventoryManager Inventory; 
     private Label m_FoodLabel;
-
-    // Fallback UI (UnityEngine.UI) si no hay UIDocument / Label
-    private Text m_FoodTextFallback;
-
+    private Text m_FoodTextFallback; // Fallback UI (UnityEngine.UI)
     private Label m_DeathLabel;
     private int m_FoodAmount = 20;
     private DeathManager m_DeathManager;
     private int m_CurrentLevel = 1;
     private VisualElement m_GameOverPanel;
     private Label m_GameOverMessage;
-
-    // impide que ticks tempranos afecten al estado
+    
+    // Impide que ticks tempranos afecten al estado
     private bool initialized = false;
-
     private bool m_IsGameActive = false;
     public int MaxFood = 100;
+    
     // UI Elements
-    private VisualElement m_HealthBarFill;
-    private VisualElement m_DangerIcon;
     private Label m_ScoreLabel;
     private Button m_RestartButton;
-    private Coroutine m_BlinkCoroutine;
     private int m_Score = 0;
+
+    // --- NUEVA CONEXIÓN A LA BARRA EXTERNA ---
+    [Header("Conexión UI")]
+    public HealthBarController healthBar; // Arrastra aquí el nuevo objeto HealthBarSystem
+
     private void Awake()
     {
         if (Instance != null)
@@ -68,18 +67,18 @@ public class GameManager : MonoBehaviour
         InitializeUI();
         
         // Enlazar UI
-        var root = uiDoc.rootVisualElement;
-        
-        m_HealthBarFill = root.Q<VisualElement>("HealthBarFill");
-        m_DangerIcon = root.Q<VisualElement>("DangerIcon"); 
-        m_ScoreLabel = root.Q<Label>("ScoreLabel");
-        m_RestartButton = root.Q<Button>("RestartButton");
-        
-        if (m_RestartButton != null) m_RestartButton.clicked += StartNewGame;
+        if (uiDoc != null)
+        {
+            var root = uiDoc.rootVisualElement;
+            m_ScoreLabel = root.Q<Label>("ScoreLabel");
+            m_RestartButton = root.Q<Button>("RestartButton");
+            
+            if (m_RestartButton != null) m_RestartButton.clicked += StartNewGame;
+        }
 
-        // empezamos el juego con el flujo existente, pero protegidos contra ticks tempranos
-        initialized = false; // bloquea OnTurnHappen hasta que StartNewGame termine
-        NewLevel(); // mantengo tu llamada original por compatibilidad con tu flujo
+        // empezamos el juego con el flujo existente
+        initialized = false; 
+        NewLevel(); 
         StartNewGame();
         initialized = true;
     }
@@ -91,13 +90,16 @@ public class GameManager : MonoBehaviour
         {
             try
             {
-                m_GameOverPanel = uiDoc.rootVisualElement.Q<VisualElement>("GameOverPanel");
+                var root = uiDoc.rootVisualElement;
+                m_GameOverPanel = root.Q<VisualElement>("GameOverPanel");
                 if (m_GameOverPanel != null)
                     m_GameOverMessage = m_GameOverPanel.Q<Label>("GameOverMessage");
-                m_FoodLabel = uiDoc.rootVisualElement.Q<Label>("FoodLabel");
-                m_FoodLabel.text = "Food : " + m_FoodAmount;
-                m_DeathLabel = uiDoc.rootVisualElement.Q<Label>("DeathLabel");
-                m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
+                
+                m_FoodLabel = root.Q<Label>("FoodLabel");
+                if(m_FoodLabel != null) m_FoodLabel.text = "Food : " + m_FoodAmount;
+                
+                m_DeathLabel = root.Q<Label>("DeathLabel");
+                if(m_DeathLabel != null) m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
             }
             catch (Exception ex)
             {
@@ -109,7 +111,7 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("[GameManager] uiDoc no asignado en el inspector. Usaré un fallback UI Text.");
         }
 
-        // Si no encontramos la FoodLabel de UI Toolkit, creamos un fallback sencillo con Canvas + Text
+        // Si no encontramos la FoodLabel de UI Toolkit, creamos un fallback
         if (m_FoodLabel == null)
         {
             CreateFallbackFoodText();
@@ -157,65 +159,27 @@ public class GameManager : MonoBehaviour
         // Ignorar ticks hasta que la inicialización haya finalizado
         if (!initialized) return;
         ChangeFood(-1);
-
     }
 
     public void ChangeFood(int amount)
     {
-        // Seguridad: si aún no estamos completamente inicializados, ignorar cambios accidentales
-        if (!initialized)
-        {
-            Debug.Log("[GameManager] ChangeFood ignorado porque game no está inicializado todavía.");
-            return;
-        }
+        // Seguridad: si aún no estamos completamente inicializados, ignorar
+        if (!initialized) return;
 
         m_FoodAmount += amount;
         m_FoodAmount = Mathf.Clamp(m_FoodAmount, 0, MaxFood);
 
-        // ---  BARRA Y COLORES ---
-        if (m_HealthBarFill != null)
+        // --- ENVIAR DATOS A LA BARRA EXTERNA ---
+        if (healthBar != null)
         {
-            float percentage = (float)m_FoodAmount / MaxFood * 100f;
-            m_HealthBarFill.style.width = Length.Percent(percentage);
-            
-            // Usamos StyleColor para compatibilidad completa
-            if(percentage > 50) 
-            {
-                // Verde - Todo bien
-                m_HealthBarFill.style.backgroundColor = new StyleColor(new Color(0.2f, 0.8f, 0.2f)); 
-                StopBlinking(); 
-            }
-            else if (percentage > 25)
-            {
-                // Naranja - Advertencia
-                m_HealthBarFill.style.backgroundColor = new StyleColor(new Color(1f, 0.64f, 0f)); 
-                StopBlinking();
-            }
-            else 
-            {
-                // Rojo - CRÍTICO
-                m_HealthBarFill.style.backgroundColor = new StyleColor(Color.red);
-                
-                // Solo parpadea si estamos vivos
-                if(m_FoodAmount > 0)
-                {
-                    StartBlinking(); 
-                }
-            }
+            healthBar.UpdateHealth(m_FoodAmount, MaxFood);
         }
-        // --------------------------------
+        // --------------------------------------
 
-        // actualizar UI Toolkit si existe
+        // actualizar UI Toolkit texto si existe
         if (m_FoodLabel != null)
         {
-            try
-            {
-                m_FoodLabel.text = "Food : " + m_FoodAmount;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning("[GameManager] error actualizando m_FoodLabel: " + ex.Message);
-            }
+            m_FoodLabel.text = "Food : " + m_FoodAmount;
         }
 
         // actualizar fallback UI Text si existe
@@ -227,75 +191,16 @@ public class GameManager : MonoBehaviour
         // comprobaciones GameOver
         if (m_FoodAmount <= 0)
         {
-            StopBlinking();
             GameOver();
         }
     }
 
-    // LATIDO 
-    void StartBlinking()
+    private void HandlePlayerDeath()
     {
-        // Si ya está parpadeando, no hacemos nada para no duplicar corrutinas
-        if (m_BlinkCoroutine != null) return;
-        
-        if (m_DangerIcon != null)
-        {
-            m_BlinkCoroutine = StartCoroutine(BlinkRoutine());
-        }
-    }
-
-    void StopBlinking()
-    {
-        if (m_BlinkCoroutine != null)
-        {
-            StopCoroutine(m_BlinkCoroutine);
-            m_BlinkCoroutine = null;
-        }
-        
-        // Aseguramos que se oculte y reseteamos la opacidad
-        if (m_DangerIcon != null)
-        {
-            m_DangerIcon.style.visibility = Visibility.Hidden;
-            m_DangerIcon.style.opacity = 1f; // Resetear para la próxima vez
-        }
-    }
-
-    IEnumerator BlinkRoutine()
-    {
-        // Hacemos visible el icono antes de empezar a cambiar la opacidad
-        m_DangerIcon.style.visibility = Visibility.Visible;
-        
-        float duration = 0.5f; // Duración de medio latido 
-
-        while (true)
-        {
-            // De transparente a visible (Fade In)
-            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
-            {
-                m_DangerIcon.style.opacity = t; 
-                yield return null;
-            }
-            
-            m_DangerIcon.style.opacity = 1f; // Asegurar tope visible
-
-            // De visible a transparente 
-            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
-            {
-                m_DangerIcon.style.opacity = 1f - t;
-                yield return null;
-            }
-            // Pequeña pausa 
-            yield return null; 
-        }
+        m_DeathManager.RegisterDeath();
+        if(m_DeathLabel != null) m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
     }
     
-    private void HandlePlayerDeath()
-        {
-            m_DeathManager.RegisterDeath();
-            m_DeathLabel.text = "Deaths: " + m_DeathManager.TotalDeaths;
-        }
-    // ------------------------------------
-
     public void AddScore(int amount)
     {
         m_Score += amount;
@@ -320,10 +225,6 @@ public class GameManager : MonoBehaviour
             board.Clear();
             board.InitLevel(m_CurrentLevel);
         }
-        else
-        {
-            
-        }
         
         if(player != null) player.Spawn(board, new Vector2Int(1,1));
     }
@@ -335,9 +236,11 @@ public class GameManager : MonoBehaviour
         m_FoodAmount = MaxFood; 
         m_Score = 0;
         
+        // Detener parpadeo en la barra externa
+        if (healthBar != null) healthBar.StopBlinking();
+        
         // Reset inicial UI
         ChangeFood(0); 
-        StopBlinking(); 
         
         if(m_ScoreLabel != null) m_ScoreLabel.text = "Score: " + m_Score;
         
