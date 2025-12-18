@@ -7,94 +7,226 @@ public class HealthBarController : MonoBehaviour
     [Header("Referencias UI")]
     public UIDocument uiDocument;
 
-    [Header("--- CONFIGURACIÓN DE ARTISTAS ---")]
-    [Tooltip("Define los colores de la barra (Izquierda=Vacío/Rojo, Derecha=Lleno/Verde)")]
+    [Header("--- SENSACIÓN DE JUEGO (GAME FEEL) ---")]
+    [Tooltip("Gradiente de color (Rojo a Verde/Morado)")]
     public Gradient barraDeVida;
+    
+    [Tooltip("Velocidad barra principal")]
+    public float velocidadVerde = 5f; 
+    
+    [Tooltip("Velocidad barra blanca (fantasma)")]
+    public float velocidadFantasma = 2f; 
+    
+    [Tooltip("Tiempo de espera antes de que baje la fantasma")]
+    public float retrasoFantasma = 0.5f;
 
-    private VisualElement m_HealthBarFill;
+    // Referencias internas
+    private VisualElement m_Container;      
+    private VisualElement m_HealthBarFill;  
+    private VisualElement m_HealthBarGhost; 
     private VisualElement m_DangerIcon;
-    private Coroutine m_BlinkCoroutine;
 
-    void Start()
+    // Variables de estado
+    private float m_FillAmount = 1f;   
+    private float m_GhostAmount = 1f;  
+    private float m_TargetAmount = 1f; 
+    
+    // Control de daño
+    private int m_LastHealthValue; 
+    private bool m_EsPrimeraActualizacion = true; 
+
+    private Coroutine m_MainCoroutine;
+    private Coroutine m_ImpactShakeCoroutine;
+    private Coroutine m_CriticalShakeCoroutine;
+
+    public void Initialize()
     {
-        if (uiDocument == null) uiDocument = GetComponent<UIDocument>();
+        if (uiDocument == null) uiDocument = FindObjectOfType<UIDocument>();
+        if (uiDocument == null) return;
 
-        if (uiDocument != null)
-        {
-            var root = uiDocument.rootVisualElement;
-            m_HealthBarFill = root.Q<VisualElement>("HealthBarFill");
-            m_DangerIcon = root.Q<VisualElement>("DangerIcon");
+        var root = uiDocument.rootVisualElement;
+        
+        m_Container = root.Q<VisualElement>("HealthBarContainer");
+        m_HealthBarFill = root.Q<VisualElement>("HealthBarFill");
+        m_HealthBarGhost = root.Q<VisualElement>("HealthBarGhost");
+        m_DangerIcon = root.Q<VisualElement>("DangerIcon");
 
-            if (m_DangerIcon != null)
-                m_DangerIcon.style.visibility = Visibility.Hidden;
+        if (m_DangerIcon != null) 
+            m_DangerIcon.style.visibility = Visibility.Hidden;
 
-            // --- CORRECCIÓN AQUÍ ---
-            // Forzamos que la barra empiece al 100% (Verde) y llena visualmente
-            // para evitar que se vea roja o vacía mientras carga el juego.
-            if (m_HealthBarFill != null)
-            {
-                UpdateHealth(100, 100); 
-            }
-        }
+        m_EsPrimeraActualizacion = true; 
+        
+        m_FillAmount = 1f;
+        m_GhostAmount = 1f;
+        m_TargetAmount = 1f;
+        ActualizarGraficos();
     }
 
     public void UpdateHealth(int current, int max)
     {
         if (m_HealthBarFill == null) return;
-
-        // Evitar división por cero
         if (max == 0) max = 1;
 
-        float percentage01 = Mathf.Clamp01((float)current / max);
-        
-        m_HealthBarFill.style.width = Length.Percent(percentage01 * 100f);
+        if (m_EsPrimeraActualizacion)
+        {
+            m_LastHealthValue = current;
+            m_EsPrimeraActualizacion = false;
+            
+            m_TargetAmount = Mathf.Clamp01((float)current / max);
+            m_FillAmount = m_TargetAmount;
+            m_GhostAmount = m_TargetAmount;
+            ActualizarGraficos();
+            
+            CheckCriticalMode(current);
+            return; 
+        }
 
-        Color colorEvaluado = barraDeVida.Evaluate(percentage01);
-        m_HealthBarFill.style.backgroundColor = new StyleColor(colorEvaluado);
-
-        if (percentage01 < 0.25f && current > 0) StartBlinking();
-        else StopBlinking();
+        float nuevoObjetivo = Mathf.Clamp01((float)current / max);
         
-        if (current <= 0) StopBlinking();
+        int damageReceived = m_LastHealthValue - current;
+        m_LastHealthValue = current;
+
+        // Solo tiembla si el daño es MAYOR que 1 (ignora caminar)
+        if (damageReceived > 1) 
+        {
+            StartImpactShake();
+        }
+
+        m_TargetAmount = nuevoObjetivo;
+
+        if (m_MainCoroutine == null)
+            m_MainCoroutine = StartCoroutine(RutinaAnimacion());
+
+        CheckCriticalMode(current);
     }
 
-    private void StartBlinking()
+    private void CheckCriticalMode(int current)
     {
-        if (m_BlinkCoroutine != null || m_DangerIcon == null) return;
-        m_BlinkCoroutine = StartCoroutine(BlinkRoutine());
+        if (m_TargetAmount < 0.25f && current > 0) 
+        {
+            StartCriticalMode();
+        }
+        else 
+        {
+            StopCriticalMode();
+        }
     }
 
+    private IEnumerator RutinaAnimacion()
+    {
+        float timerRetraso = 0f;
+
+        while (Mathf.Abs(m_FillAmount - m_TargetAmount) > 0.001f || Mathf.Abs(m_GhostAmount - m_TargetAmount) > 0.001f)
+        {
+            m_FillAmount = Mathf.Lerp(m_FillAmount, m_TargetAmount, Time.deltaTime * velocidadVerde);
+
+            if (m_FillAmount < m_GhostAmount)
+            {
+                timerRetraso += Time.deltaTime;
+                if (timerRetraso > retrasoFantasma)
+                {
+                    m_GhostAmount = Mathf.Lerp(m_GhostAmount, m_FillAmount, Time.deltaTime * velocidadFantasma);
+                }
+            }
+            else
+            {
+                m_GhostAmount = m_FillAmount; 
+                timerRetraso = 0f;
+            }
+
+            ActualizarGraficos();
+            yield return null;
+        }
+
+        m_FillAmount = m_TargetAmount;
+        m_GhostAmount = m_TargetAmount;
+        ActualizarGraficos();
+        m_MainCoroutine = null;
+    }
+
+    private void ActualizarGraficos()
+    {
+        if (m_HealthBarFill != null) 
+            m_HealthBarFill.style.width = Length.Percent(m_FillAmount * 100f);
+        
+        if (m_HealthBarGhost != null) 
+            m_HealthBarGhost.style.width = Length.Percent(m_GhostAmount * 100f);
+
+        if (barraDeVida != null && m_HealthBarFill != null)
+        {
+            m_HealthBarFill.style.backgroundColor = new StyleColor(barraDeVida.Evaluate(m_FillAmount));
+        }
+    }
+
+    private void StartImpactShake()
+    {
+        if (m_CriticalShakeCoroutine != null) return;
+        if (m_ImpactShakeCoroutine != null) StopCoroutine(m_ImpactShakeCoroutine);
+        m_ImpactShakeCoroutine = StartCoroutine(ImpactShakeRoutine());
+    }
+
+    private IEnumerator ImpactShakeRoutine()
+    {
+        if (m_Container == null) yield break;
+
+        float duration = 0.2f; 
+        float magnitude = 8f; 
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            float x = Random.Range(-1f, 1f) * magnitude;
+            float y = Random.Range(-1f, 1f) * magnitude;
+            m_Container.style.translate = new Translate(x, y, 0);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        m_Container.style.translate = new Translate(0, 0, 0);
+    }
+
+    private void StartCriticalMode()
+    {
+        if (m_DangerIcon != null) m_DangerIcon.style.visibility = Visibility.Visible;
+        if (m_CriticalShakeCoroutine == null) m_CriticalShakeCoroutine = StartCoroutine(CriticalShakeRoutine());
+    }
+
+    private void StopCriticalMode()
+    {
+        if (m_DangerIcon != null) m_DangerIcon.style.visibility = Visibility.Hidden;
+        if (m_CriticalShakeCoroutine != null)
+        {
+            StopCoroutine(m_CriticalShakeCoroutine);
+            m_CriticalShakeCoroutine = null;
+            if (m_Container != null) m_Container.style.translate = new Translate(0, 0, 0);
+        }
+    }
+
+    // --- ESTA ES LA FUNCIÓN RESTAURADA PARA ARREGLAR EL ERROR ---
     public void StopBlinking()
     {
-        if (m_BlinkCoroutine != null)
-        {
-            StopCoroutine(m_BlinkCoroutine);
-            m_BlinkCoroutine = null;
-        }
-        if (m_DangerIcon != null)
-        {
-            m_DangerIcon.style.visibility = Visibility.Hidden;
-            m_DangerIcon.style.opacity = 1f;
-        }
+        // Al reiniciar el juego, simplemente paramos el modo crítico
+        StopCriticalMode();
     }
+    // -------------------------------------------------------------
 
-    private IEnumerator BlinkRoutine()
+    private IEnumerator CriticalShakeRoutine()
     {
-        m_DangerIcon.style.visibility = Visibility.Visible;
-        float duration = 0.5f;
+        if (m_Container == null) yield break;
+        
+        float magnitude = 2f; 
 
         while (true)
         {
-            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
+            float x = Random.Range(-1f, 1f) * magnitude;
+            float y = Random.Range(-1f, 1f) * magnitude;
+            m_Container.style.translate = new Translate(x, y, 0);
+            
+            if (m_DangerIcon != null)
             {
-                m_DangerIcon.style.opacity = t;
-                yield return null;
+                m_DangerIcon.style.opacity = Mathf.PingPong(Time.time * 2f, 1f);
             }
-            for (float t = 0; t < 1f; t += Time.deltaTime / duration)
-            {
-                m_DangerIcon.style.opacity = 1f - t;
-                yield return null;
-            }
+
+            yield return null;
         }
     }
 }

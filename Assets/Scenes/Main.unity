@@ -230,10 +230,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   board: {fileID: 1263079468}
   player: {fileID: 2047128601}
-  uiDoc: {fileID: 783348122}
   Inventory: {fileID: 586537616}
-  MaxFood: 50
+  uiDoc: {fileID: 783348122}
   healthBar: {fileID: 2033121024}
+  MaxFood: 100
 --- !u!4 &586537615
 Transform:
   m_ObjectHideFlags: 0
@@ -705,12 +705,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -977,6 +977,9 @@ MonoBehaviour:
     m_ColorSpace: -1
     m_NumColorKeys: 4
     m_NumAlphaKeys: 2
+  velocidadVerde: 5
+  velocidadFantasma: 2
+  retrasoFantasma: 0.5
 --- !u!4 &2033121025
 Transform:
   m_ObjectHideFlags: 0
