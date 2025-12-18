@@ -8,8 +8,9 @@ public class Food : Item
     
     public override void Use()
     {
-        GameManager.Instance.Inventory.Clear(this);
-        GameManager.Instance.ChangeFood(Amount);
         GameManager.Instance.Inventory.Remove(this);
+        GameManager.Instance.ChangeFood(Amount);
+        GameManager.Instance.Inventory.Clear(this);
+        
     }
 }

@@ -71,7 +71,7 @@ namespace DefaultNamespace
 
         public void Clear(Item item)
         {
-            if (itemStack[item] == 1)
+            if (itemStack[item] == 0)
             {
                 foreach (Transform child in Panel.transform)
                 {
